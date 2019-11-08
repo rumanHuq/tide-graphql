@@ -1,74 +1,36 @@
-/* use tide::{App, Context};
-fn main() {
-    let mut app = App::new();
+use std::ops::Add;
 
-    app.at("/").get(root_service);
-
-    app.serve("127.0.0.1:80").unwrap();
+struct Point<T, U> {
+    x: T, // T is unknown type, we dont know if it can do mathematical ops
+    y: U,
 }
 
-async fn root_service(_: Context<()>)->String{
-    let ruman = Person;
-    format!("I am smartass, {} that", ruman.smart())
-}
-
-
-struct Person;
-trait Human {
-    fn smart(&self)->bool;
-}
-
-impl Human for Person {
-    fn smart(&self)->bool {
-        true
+// We are making assumption T must implement Add trait, in order to ensure it can do mathematics
+// We are also saying Add returns OUTPUT of type T ensuring mathematical capabilities
+impl<T: Add<Output = T>, U: Add<Output = U>> Add for Point<T, U> {
+    type Output = Point<T, U>;
+    fn add(self, rhs: Self) -> Self::Output {
+        Point {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+        }
     }
 }
 
-
-
-enum List {
-    Cons(i32, Box<List>),
-    Nil
-}
- */
-
-use std::ops::Deref;
-
-#[derive(Debug)]
-struct MyBox<T>(T);
-
-impl<T> MyBox<T> {
-    fn new(item: T) -> MyBox<T> {
-        MyBox(item)
-    }
-}
-
-type Target<T> = T;
-impl<T> Deref for MyBox<T> {
-    type Target = Target<T>;
-    fn deref(&self) -> &T {
-        &self.0
-    }
-}
-
-fn main() {
-    let c = MyBox::new("Hello");
-    println!("{:?}", *c);
-}
+fn main() {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
     #[test]
-    fn deref_test() {
-        let a = 10;
-        let b = MyBox::new(a * 10);
+    fn assoc_types_test() {
+        let a = Point { x: 1, y: 2 };
+        let b = Point { x: 1, y: 2 };
 
-        println!("{:?}", *b);
-        assert_eq!(10, a);
-        // magick behind the scene
-        // b.deref() = &self.0 -> *(&self.0) -> 100
-        assert_eq!(100, *b);
+        let c = a + b;
+
+        assert_eq!(2, c.x);
+        assert_eq!(4, c.y);
     }
 }
