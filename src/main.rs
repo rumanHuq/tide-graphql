@@ -1,36 +1,36 @@
 use std::ops::Add;
-
-struct Point<T, U> {
-    x: T, // T is unknown type, we dont know if it can do mathematical ops
-    y: U,
+use std::rc::Rc;
+#[derive(Debug)]
+enum List<T: Add<Output = T>> {
+    Cons(T, Rc<List<T>>),
+    Undefined,
 }
 
-// We are making assumption T must implement Add trait, in order to ensure it can do mathematics
-// We are also saying Add returns OUTPUT of type T ensuring mathematical capabilities
-impl<T: Add<Output = T>, U: Add<Output = U>> Add for Point<T, U> {
-    type Output = Point<T, U>;
-    fn add(self, rhs: Self) -> Self::Output {
-        Point {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
-        }
-    }
-}
+use List::{Cons, Undefined};
 
-fn main() {}
+fn main() {
+    let a = Rc::new(Cons(5, Rc::new(Undefined)));
+    // b is shared owner of a
+    let b = Rc::new(Cons(3, Rc::clone(&a)));
+    // c is shared owner of a
+    let c = Rc::new(Cons(4, Rc::clone(&a)));
+
+    println!("{:#?}-{:#?}-{:#?}", *a, *b, *c);
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
     #[test]
-    fn assoc_types_test() {
-        let a = Point { x: 1, y: 2 };
-        let b = Point { x: 1, y: 2 };
-
-        let c = a + b;
-
-        assert_eq!(2, c.x);
-        assert_eq!(4, c.y);
+    fn rc_test() {
+        let a = Rc::new(Cons(5, Rc::new(Undefined)));
+        assert_eq!(1, Rc::strong_count(&a));
+        {
+            let _b = Rc::new(Cons(3, Rc::clone(&a)));
+            assert_eq!(2, Rc::strong_count(&a));
+        }
+        let _c = Rc::new(Cons(4, Rc::clone(&a)));
+        assert_eq!(2, Rc::strong_count(&a));
     }
 }
