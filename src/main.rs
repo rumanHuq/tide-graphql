@@ -1,36 +1,65 @@
-use std::ops::Add;
-use std::rc::Rc;
-#[derive(Debug)]
-enum List<T: Add<Output = T>> {
-    Cons(T, Rc<List<T>>),
-    Undefined,
+trait Messenger {
+    fn send(&self, msg: &str);
+}
+struct LimitTracker<'lifetime, T: Messenger> {
+    messenger: &'lifetime T,
+    value: usize,
+    max: usize,
 }
 
-use List::{Cons, Undefined};
+impl<'lifetime, T: Messenger> LimitTracker<'lifetime, T> {
+    fn new(messenger: &T, max: usize) -> LimitTracker<T> {
+        LimitTracker {
+            messenger,
+            value: 0,
+            max,
+        }
+    }
 
-fn main() {
-    let a = Rc::new(Cons(5, Rc::new(Undefined)));
-    // b is shared owner of a
-    let b = Rc::new(Cons(3, Rc::clone(&a)));
-    // c is shared owner of a
-    let c = Rc::new(Cons(4, Rc::clone(&a)));
+    fn set_value(&mut self, value: usize) {
+        self.value = value;
 
-    println!("{:#?}-{:#?}-{:#?}", *a, *b, *c);
+        let max_percentage = self.value as f64 / self.max as f64;
+
+        if max_percentage >= 1.0 {
+            self.messenger.send("Error, quota exceeded");
+        } else if max_percentage >= 0.9 {
+            self.messenger.send("90% limit reached");
+        } else if max_percentage >= 0.75 {
+            self.messenger.send("75% limit reached");
+        }
+    }
 }
+
+fn main() {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
-    #[test]
-    fn rc_test() {
-        let a = Rc::new(Cons(5, Rc::new(Undefined)));
-        assert_eq!(1, Rc::strong_count(&a));
-        {
-            let _b = Rc::new(Cons(3, Rc::clone(&a)));
-            assert_eq!(2, Rc::strong_count(&a));
+    use std::cell::RefCell;
+    struct MockMessenger {
+        sent_messages: RefCell<Vec<String>>,
+    }
+
+    impl MockMessenger {
+        fn new() -> MockMessenger {
+            MockMessenger {
+                sent_messages: RefCell::new(vec![]),
+            }
         }
-        let _c = Rc::new(Cons(4, Rc::clone(&a)));
-        assert_eq!(2, Rc::strong_count(&a));
+    }
+    impl Messenger for MockMessenger {
+        fn send(&self, value: &str) {
+            &self.sent_messages.borrow_mut().push(value.into());
+        }
+    }
+    #[test]
+    fn sends_over_90_percent_warning() {
+        let mock_messenger = MockMessenger::new();
+        let mut limit_tracker = LimitTracker::new(&mock_messenger, 100);
+        limit_tracker.set_value(90);
+
+        assert_eq!(mock_messenger.sent_messages.borrow().len(), 1);
     }
 }
