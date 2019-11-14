@@ -1,8 +1,17 @@
+use serde_json::Value;
 use http::status::StatusCode;
+use serde::{Serialize, Deserialize};
 use tide::{error::ResultExt, response, Context, EndpointResult};
 use super::super::State;
-use juniper::{self, RootNode, http::GraphQLRequest, FieldResult};
-use serde_json::Value;
+use juniper::{
+    self,
+    object,
+    RootNode,
+    http::GraphQLRequest,
+    FieldResult,
+    GraphQLObject,
+    GraphQLInputObject
+};
 use mongodb::{
     doc,
     db::{ThreadedDatabase},
@@ -10,15 +19,14 @@ use mongodb::{
     bson,
     Bson
 };
-use serde::{Serialize, Deserialize};
-#[derive(juniper::GraphQLObject, Default, Serialize, Deserialize, Debug)]
+#[derive(GraphQLObject, Default, Serialize, Deserialize, Debug)]
 #[graphql(description="A humanoid creature in the Star Wars universe")]
 struct Human {
     name: String,
     sex: String
 }
 
-#[derive(juniper::GraphQLInputObject)]
+#[derive(GraphQLInputObject)]
 #[graphql(description="A humanoid creature in the Star Wars universe")]
 struct NewHuman {
     name: String
@@ -29,11 +37,8 @@ struct Query;
 struct Mutation;
 impl juniper::Context for State {}
 
-#[juniper::object(Context = State)]
+#[object(Context = State)]
 impl Query {
-    fn bla() -> &str {
-        "1.0"
-    }
     fn movie(ctx: &State, id: String)->FieldResult<Human>{
         let collection = ctx.db.collection("users");
         let doc = doc! {
@@ -49,7 +54,7 @@ impl Query {
     }
 }
 
-#[juniper::object(Context = State)]
+#[object(Context = State)]
 impl Mutation {
     fn hola()->FieldResult<String> {
         Ok("moi".into())
