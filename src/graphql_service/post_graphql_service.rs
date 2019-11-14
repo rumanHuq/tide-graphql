@@ -3,6 +3,8 @@ use http::status::StatusCode;
 use serde::{Serialize, Deserialize};
 use tide::{error::ResultExt, response, Context, EndpointResult};
 use super::super::State;
+use std::sync::Mutex;
+
 use juniper::{
     self,
     object,
@@ -40,7 +42,7 @@ impl juniper::Context for State {}
 #[object(Context = State)]
 impl Query {
     fn movie(ctx: &State, id: String)->FieldResult<Human>{
-        let collection = ctx.db.collection("users");
+        let collection = ctx.db.lock().unwrap().collection("users");
         let doc = doc! {
             "_id": ObjectId::with_string(&id[..]).unwrap()
         };
