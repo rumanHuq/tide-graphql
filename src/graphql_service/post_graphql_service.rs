@@ -1,41 +1,65 @@
 use http::status::StatusCode;
-use juniper::graphql_object;
-use std::sync::{atomic};
 use tide::{error::ResultExt, response, Context, EndpointResult};
 use super::super::State;
+use juniper::{self, RootNode, http::GraphQLRequest, FieldResult};
+use serde_json::Value;
+use mongodb::{
+    doc,
+    db::{ThreadedDatabase},
+    oid::ObjectId,
+    bson,
+    Bson
+};
+use serde::{Serialize, Deserialize};
+#[derive(juniper::GraphQLObject, Default, Serialize, Deserialize, Debug)]
+#[graphql(description="A humanoid creature in the Star Wars universe")]
+struct Human {
+    name: String,
+    sex: String
+}
 
+#[derive(juniper::GraphQLInputObject)]
+#[graphql(description="A humanoid creature in the Star Wars universe")]
+struct NewHuman {
+    name: String
+}
+
+
+struct Query;
+struct Mutation;
 impl juniper::Context for State {}
 
-// We define `Query` unit struct here. GraphQL queries will refer to this struct. The struct itself
-// doesn't have any associated data (and there's no need to do so), but instead it exposes the
-// accumulator state from the context.
-struct Query;
-
-graphql_object!(Query: State |&self| {
-    // GraphQL integers are signed and 32 bits long.
-    field accumulator(&executor) -> i32 as "Current value of the accumulator" {
-        executor.context().0.load(atomic::Ordering::Relaxed) as i32
+#[juniper::object(Context = State)]
+impl Query {
+    fn bla() -> &str {
+        "1.0"
     }
-});
-
-// Here is `Mutation` unit struct. GraphQL mutations will refer to this struct. This is similar to
-// `Query`, but it provides the way to "mutate" the accumulator state.
-struct Mutation;
-
-graphql_object!(Mutation: State |&self| {
-    field add(&executor, by: i32) -> i32 as "Add given value to the accumulator." {
-        executor.context().0.fetch_add(by as isize, atomic::Ordering::Relaxed) as i32 + by
+    fn movie(ctx: &State, id: String)->FieldResult<Human>{
+        let collection = ctx.db.collection("users");
+        let doc = doc! {
+            "_id": ObjectId::with_string(&id[..]).unwrap()
+        };
+        let mut cursor = collection.find_one(Some(doc.clone()), None)
+        .ok().expect("Failed to execute find.");
+        if let Some(doc) = cursor {
+            let json: Value = Bson::Document(doc).into();
+            let u: Human = serde_json::from_value(json).unwrap();
+            Ok(u)
+        } else { Ok(Human::default()) }
     }
-});
+}
 
-// Adding `Query` and `Mutation` together we get `Schema`, which describes, well, the whole GraphQL
-// schema.
-type Schema = juniper::RootNode<'static, Query, Mutation>;
+#[juniper::object(Context = State)]
+impl Mutation {
+    fn hola()->FieldResult<String> {
+        Ok("moi".into())
+    }
+}
 
-// Finally, we'll bridge between Tide and Juniper. `GraphQLRequest` from Juniper implements
-// `Deserialize`, so we use `Json` extractor to deserialize the request body.
+type Schema = RootNode<'static, Query, Mutation>;
+
 pub async fn post_graphql_service(mut cx: Context<State>) -> EndpointResult {
-    let query: juniper::http::GraphQLRequest = cx.body_json().await.client_err()?;
+    let query: GraphQLRequest = cx.body_json().await.client_err()?;
     let schema = Schema::new(Query, Mutation);
     let gql = query.execute(&schema, cx.state());
     let status = if gql.is_ok() {
